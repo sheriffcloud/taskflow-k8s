@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: taskflow-config
+  namespace: taskflow
+data:
+  # Non-sensitive environment variables
+  # Stored as plain text — visible to anyone with cluster access
+  # Never put passwords or tokens here
+
+  NODE_ENV: "production"
+
+  # Service URLs — how services find each other inside the cluster
+  # Format: http://<service-name>.<namespace>.svc.cluster.local:<port>
+  # Short form: http://<service-name>:<port> (works within same namespace)
+  USER_SERVICE_URL: "http://user-service:3001"
+  TASK_SERVICE_URL: "http://task-service:3002"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:3003"
+
+  # Ports
+  API_GATEWAY_PORT: "3000"
+  USER_SERVICE_PORT: "3001"
+  TASK_SERVICE_PORT: "3002"
+  NOTIFICATION_SERVICE_PORT: "3003"
+  FRONTEND_PORT: "80"
+
+  # AWS Region
+  AWS_REGION: "us-east-1"
+
+  # Rate limiting
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX: "100"

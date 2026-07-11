@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  # This name is THE DNS name other pods use to find this service
+  # api-gateway calls: http://user-service:3001
+  # Kubernetes resolves "user-service" to the pod IPs automatically
+  namespace: taskflow
+  labels:
+    app: user-service
+
+spec:
+  type: ClusterIP
+  # ClusterIP = only reachable inside the cluster
+  # No external access — only pods can call this
+  #
+  # Other types:
+  # NodePort     = exposed on each node's IP (testing only)
+  # LoadBalancer = creates AWS load balancer (external access)
+  #
+  # user-service should NEVER be directly accessible from internet
+  # Traffic must go: internet → ALB → ingress → api-gateway → user-service
+
+  selector:
+    app: user-service
+    # The Service uses this to find which pods to route to
+    # Finds all pods with label app=user-service
+    # Then load balances traffic between them
+    # If a pod dies, it's automatically removed from rotation
+    # If a new pod starts, it's automatically added
+
+  ports:
+    - name: http
+      port: 3001
+      # port = the port THIS SERVICE listens on
+      # Other pods call: http://user-service:3001
+      targetPort: 3001
+      # targetPort = the port on the POD to forward to
+      # Must match containerPort in the Deployment
+      # and the port your app actually listens on
+      protocol: TCP

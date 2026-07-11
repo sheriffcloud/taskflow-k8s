@@ -1,0 +1,195 @@
+apiVersion: apps/v1
+# apps/v1 is the API group for Deployments
+# Different from v1 (which handles Pods, Services, Secrets)
+# Deployments are in the "apps" group because they
+# manage application lifecycle, not just infrastructure
+
+kind: Deployment
+# Tells Kubernetes: "I want a Deployment resource"
+# A Deployment ensures a specified number of pod replicas
+# are always running — if one crashes, it restarts it
+
+metadata:
+  name: user-service
+  # The name of this Deployment inside Kubernetes
+  # Used by: kubectl get deployment user-service -n taskflow
+  namespace: taskflow
+  # Which namespace this belongs to
+  # Must match where your secrets and configmaps are
+  labels:
+    app: user-service
+    # Labels are key-value pairs for organizing resources
+    # This label connects the Deployment to its Service
+    # Think of it like a tag on a shipping box
+
+spec:
+  # spec = "specification" = what you want
+  replicas: 2
+  # Run 2 copies of this pod simultaneously
+  # Benefits:
+  # → If one pod crashes, the other keeps serving traffic
+  # → Requests distributed between both pods (load balancing)
+  # → Zero downtime during rolling updates
+
+  selector:
+    matchLabels:
+      app: user-service
+    # The Deployment uses this selector to find
+    # which pods IT is responsible for managing
+    # Must match the labels in template.metadata.labels below
+    # Think of it like: "manage all pods tagged app=user-service"
+
+  strategy:
+    type: RollingUpdate
+    # How to update pods when you push a new image
+    #
+    # RollingUpdate (what we use):
+    #   Update one pod at a time
+    #   New pod starts → old pod stops
+    #   Always at least 1 pod running → zero downtime
+    #
+    # Recreate (alternative):
+    #   Stop ALL pods then start new ones
+    #   Brief downtime during update
+    #   Simpler but not suitable for production
+    rollingUpdate:
+      maxSurge: 1
+      # During update, allow 1 EXTRA pod above desired count
+      # With replicas=2: during update you might have 3 pods briefly
+      # The extra pod is the new version being tested
+      maxUnavailable: 0
+      # During update, 0 pods can be unavailable
+      # Guarantees at least 2 pods always serving traffic
+      # Combined with maxSurge=1: update one at a time safely
+
+  template:
+    # template describes the pods this Deployment creates
+    # Everything under here is the pod specification
+    metadata:
+      labels:
+        app: user-service
+        # These labels MUST match selector.matchLabels above
+        # This is how the Deployment knows which pods are "its" pods
+    spec:
+      containers:
+        - name: user-service
+          # Name of the container inside the pod
+          # A pod can have multiple containers (sidecars)
+          # but we use one container per pod
+
+          image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/taskflow-production-user-service:latest
+          # The Docker image to run
+          # This is the ECR URL from our Terraform outputs
+          # Kubernetes pulls this from ECR when starting the pod
+          # The worker node IAM role gives permission to pull
+
+          ports:
+            - containerPort: 3001
+              # The port your application listens on inside the container
+              # Same as EXPOSE 3001 in the Dockerfile
+              # This is documentation — the actual port is set
+              # by your application code (process.env.PORT)
+
+          env:
+            # Environment variables injected into the container
+            # These replace what docker-compose had under "environment:"
+
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: taskflow-config
+                  key: USER_SERVICE_PORT
+            # Read PORT from our ConfigMap
+            # valueFrom.configMapKeyRef = "get value from a ConfigMap"
+            # name = which ConfigMap to read from
+            # key = which key inside that ConfigMap
+            # Result: PORT=3001
+
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: taskflow-config
+                  key: NODE_ENV
+            # NODE_ENV=production from ConfigMap
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: taskflow-secrets
+                  key: JWT_SECRET
+            # Read JWT_SECRET from our Secret
+            # secretKeyRef instead of configMapKeyRef
+            # because this is sensitive data
+            # Kubernetes only injects this into memory
+            # never writes it to disk
+
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: taskflow-secrets
+                  key: DATABASE_URL
+            # Full PostgreSQL connection string
+            # Points to our RDS instance
+            # Replaces: postgres://taskflow:secret@postgres-user:5432/user_db
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+              # REQUESTS = minimum guaranteed resources
+              # Kubernetes uses this for scheduling decisions:
+              # "Does this node have 128MB free? If yes, place pod here"
+              #
+              # memory: "128Mi" = 128 mebibytes RAM
+              # cpu: "100m"     = 100 millicores = 0.1 CPU core
+              # (1000m = 1 full CPU core)
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+              # LIMITS = maximum the container can use
+              # If container exceeds memory limit → OOMKilled (restarted)
+              # If container exceeds CPU limit → throttled (slowed down)
+              #
+              # Having limits prevents one buggy pod from
+              # consuming all node resources and starving other pods
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+            # livenessProbe: "Is this pod still alive?"
+            # Kubernetes calls GET /health every 10 seconds
+            # If it fails 3 times in a row → restart the pod
+            #
+            # initialDelaySeconds: 30
+            # Wait 30 seconds before first check
+            # Gives the app time to start up and connect to DB
+            # Without this: Kubernetes checks immediately,
+            # app isn't ready yet, restarts it unnecessarily
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 3
+            # readinessProbe: "Is this pod READY to receive traffic?"
+            # Different from liveness!
+            #
+            # liveness  = "is it alive?" → restart if failing
+            # readiness = "is it ready?" → remove from load balancer if failing
+            #
+            # If readiness fails:
+            # → Pod stays running (not restarted)
+            # → Service stops sending traffic to it
+            # → Pod "comes back" when health check passes again
+            #
+            # Real scenario:
+            # Pod starts but DB connection takes 20 seconds
+            # readiness fails for 20 seconds → no traffic sent
+            # DB connects → readiness passes → traffic resumes
+            # User never sees a connection error

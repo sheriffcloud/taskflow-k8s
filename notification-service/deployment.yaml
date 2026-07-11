@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: taskflow
+  labels:
+    app: notification-service
+spec:
+  replicas: 1
+  # Only 1 replica for notification-service
+  # Because SSE connections are stateful —
+  # a client connects to ONE specific pod
+  # Multiple replicas would cause missed notifications
+  # (client connected to pod A, event arrives at pod B)
+  # In production you'd use Redis to share state between replicas
+  selector:
+    matchLabels:
+      app: notification-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/taskflow-production-notification-service:latest
+          ports:
+            - containerPort: 3003
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: taskflow-config
+                  key: NOTIFICATION_SERVICE_PORT
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: taskflow-config
+                  key: NODE_ENV
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: taskflow-secrets
+                  key: JWT_SECRET
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: taskflow-secrets
+                  key: REDIS_URL
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 3
