@@ -7,8 +7,6 @@ metadata:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    # alb.ingress.kubernetes.io/subnets: subnet-046b921c51970a731,subnet-0f1db6cba629e4779
-    # alb.ingress.kubernetes.io/security-groups: sg-0184ec1f6709e3e92
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
     alb.ingress.kubernetes.io/healthcheck-path: /health
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
