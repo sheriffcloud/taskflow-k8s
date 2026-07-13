@@ -77,7 +77,7 @@ spec:
           # A pod can have multiple containers (sidecars)
           # but we use one container per pod
 
-          image: 535002884759.dkr.ecr.us-east-1.amazonaws.com/taskflow-production-user-service:latest
+          image: 535002884759.dkr.ecr.us-east-1.amazonaws.com/taskflow-production-user-service:5fb35613
           # The Docker image to run
           # This is the ECR URL from our Terraform outputs
           # Kubernetes pulls this from ECR when starting the pod
