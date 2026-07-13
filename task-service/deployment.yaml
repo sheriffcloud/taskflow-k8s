@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: task-service
-          image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/taskflow-production-task-service:latest
+          image: 535002884759.dkr.ecr.us-east-1.amazonaws.com/taskflow-production-task-service:latest
           ports:
             - containerPort: 3002
           env:
