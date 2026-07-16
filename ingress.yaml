@@ -7,14 +7,51 @@ metadata:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
+    
+    # SSL Certificate
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:535002884759:certificate/bf40d3af-4f1e-42ea-beed-97ce910baa8f
+    # The ACM certificate ARN for netforgetech.online
+    # Enables HTTPS on port 443
+
+    # Listen on both HTTP and HTTPS
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    # Port 80  → HTTP traffic
+    # Port 443 → HTTPS traffic with SSL certificate
+
+    # Redirect HTTP to HTTPS
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # Automatically redirects:
+    # http://netforgetech.online → https://netforgetech.online
+    # Users always get HTTPS even if they type http://
+
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
     alb.ingress.kubernetes.io/healthcheck-path: /health
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
     alb.ingress.kubernetes.io/success-codes: "200"
     alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+
 spec:
   rules:
-    - http:
+    - host: netforgetech.online
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+
+    - host: www.netforgetech.online
+      http:
         paths:
           - path: /api
             pathType: Prefix
