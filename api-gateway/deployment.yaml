@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: 535002884759.dkr.ecr.us-east-1.amazonaws.com/taskflow-production-api-gateway:5fb35613
+          image: 535002884759.dkr.ecr.us-east-1.amazonaws.com/taskflow-production-api-gateway:a0a2c56b
           ports:
             - containerPort: 3000
           env:
